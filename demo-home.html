@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AJ FHIR Platform — Live Demo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;
+  font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;
+  background:#F4F6F8;}
+
+#shell{display:flex;flex-direction:column;height:100vh;}
+
+/* ── Top bar ─────────────────────────────────────────── */
+#topbar{
+  height:44px;background:#F4F6F8;border-bottom:1px solid #DDE3EA;
+  display:flex;align-items:center;padding:0 18px;gap:10px;flex-shrink:0;
+}
+#tb-phase{
+  font-size:12px;font-weight:700;color:#1B4F8A;
+  background:#E8F0FA;padding:3px 12px;border-radius:20px;
+  border:1px solid rgba(27,79,138,.2);white-space:nowrap;flex-shrink:0;
+}
+#tb-label{font-size:12px;color:#2C5070;font-weight:500;flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+#tb-dots{display:flex;align-items:center;gap:7px;flex-shrink:0;}
+.pdot{width:10px;height:10px;border-radius:50%;
+  background:#DDE3EA;border:1.5px solid #C8D2DC;cursor:pointer;
+  transition:background .2s,transform .15s;}
+.pdot.active{background:#1B4F8A;border-color:#1B4F8A;transform:scale(1.3);}
+.pdot.done{background:#0D7A6E;border-color:#0D7A6E;}
+#tb-cta{
+  font-size:12px;font-weight:600;color:#0D7A6E;text-decoration:none;
+  padding:4px 12px;border-radius:7px;border:1px solid rgba(13,122,110,.3);
+  background:rgba(13,122,110,.07);white-space:nowrap;flex-shrink:0;
+}
+
+/* ── Content row ─────────────────────────────────────── */
+#content{display:flex;flex:1;overflow:hidden;min-height:0;}
+
+/* Diagram: fills remaining space */
+#diagram{flex:1;min-width:0;background:#FFFFFF;position:relative;}
+#flow-svg{width:100%;height:100%;display:block;}
+
+/* Info panel: fixed width, right side */
+#infopanel{
+  width:230px;flex-shrink:0;
+  background:#FAFBFC;border-left:1px solid #DDE3EA;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:18px 18px;gap:12px;
+}
+#ip-badge{
+  font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;
+  letter-spacing:.05em;text-transform:uppercase;align-self:flex-start;
+  white-space:nowrap;
+}
+#ip-title{font-size:18px;font-weight:800;color:#0D1F33;line-height:1.2;}
+#ip-body{font-size:13px;color:#2C5070;line-height:1.65;}
+#ip-compliance{
+  font-size:11.5px;color:#2C5070;line-height:1.6;
+  padding:10px 12px;background:#F0F4F8;border-radius:8px;
+  border:1px solid #DDE3EA;white-space:pre-line;
+}
+#ip-link{
+  font-size:12px;font-weight:700;color:#1B4F8A;text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;margin-top:2px;
+}
+#ip-link:hover{text-decoration:underline;}
+
+/* ── Bottom bar ──────────────────────────────────────── */
+#bottombar{
+  height:38px;background:#F4F6F8;border-top:1px solid #DDE3EA;
+  display:flex;align-items:center;padding:0 18px;gap:10px;flex-shrink:0;
+}
+#btn-play{
+  width:28px;height:28px;border-radius:8px;border:1px solid #C8D2DC;
+  background:#E8EEF4;color:#2C5070;font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .12s;flex-shrink:0;
+}
+#btn-play.on{background:#1B4F8A;color:white;border-color:#1B4F8A;}
+#prog{flex:1;height:4px;background:#DDE3EA;border-radius:2px;overflow:hidden;}
+#prog-fill{height:100%;background:linear-gradient(90deg,#1B4F8A,#0D7A6E);
+  width:0%;transition:width .7s ease;border-radius:2px;}
+#bb-hint{font-size:11px;color:#3D6A8A;white-space:nowrap;}
+
+/* ── SVG node styles ──────────────────────────────────── */
+.node rect{
+  fill:#FFFFFF;stroke:#DDE3EA;stroke-width:1.5;
+  transition:fill .35s,stroke .35s,filter .35s;
+}
+.node .nt{fill:#1E3D58;font-weight:700;}
+.node .ns{fill:#3D6A8A;}
+.node .nb{fill:#5A8AA8;font-weight:700;font-family:sans-serif;}
+
+.node.navy rect{fill:#1B4F8A;stroke:#1B4F8A;
+  filter:drop-shadow(0 0 10px rgba(27,79,138,.4));}
+.node.navy .nt,.node.navy .ns{fill:white;}
+.node.teal rect{fill:#0D7A6E;stroke:#0D7A6E;
+  filter:drop-shadow(0 0 10px rgba(13,122,110,.4));}
+.node.teal .nt,.node.teal .ns{fill:white;}
+.node.amber rect{fill:#854D0E;stroke:#854D0E;
+  filter:drop-shadow(0 0 8px rgba(133,77,14,.35));}
+.node.amber .nt,.node.amber .ns{fill:white;}
+.node.done rect{fill:#EBF2F8;stroke:#9AB8D0;}
+.node.done .nt{fill:#1B4F8A;}
+.node.done .ns{fill:#3D6A8A;}
+
+.conn{stroke:#DDE3EA;stroke-width:1.5;stroke-dasharray:5 4;
+  fill:none;transition:stroke .35s,stroke-dasharray .35s,stroke-width .35s;}
+.conn.navy{stroke:#1B4F8A;stroke-dasharray:none;stroke-width:2.5;}
+.conn.teal{stroke:#0D7A6E;stroke-dasharray:none;stroke-width:2.5;}
+.conn.amber{stroke:#854D0E;stroke-dasharray:none;stroke-width:2.5;}
+</style>
+</head>
+<body>
+<div id="shell">
+
+  <!-- Top bar -->
+  <div id="topbar">
+    <div id="tb-phase">Phase 1 / 4</div>
+    <div id="tb-label">EHR launch — clinician opens cardiology app in Epic</div>
+    <div id="tb-dots">
+      <div class="pdot active" data-i="0" title="Phase 1: EHR Launch"></div>
+      <div class="pdot" data-i="1" title="Phase 2: Consent"></div>
+      <div class="pdot" data-i="2" title="Phase 3: Data Access"></div>
+      <div class="pdot" data-i="3" title="Phase 4: Audit"></div>
+    </div>
+    <a id="tb-cta" href="/demo" target="_top">34-step technical demo ↗</a>
+  </div>
+
+  <!-- Content row -->
+  <div id="content">
+
+    <!-- Diagram panel — fills width minus info panel -->
+    <div id="diagram">
+      <!--
+        viewBox: 0 0 760 320
+        Uses full width. Node layout:
+          Row 0 (y=20):  Epic(x=20)  Browser(x=220)                      [2 cols]
+          Row 1 (y=130): Auth(x=120) IdP(x=360)                          [2 cols, centred]
+          Row 2 (y=240): HAPI(x=120) Consent(x=360) Audit(x=580)         [3 cols]
+        Node size: w=160 h=62 for row0/row1, w=160 h=58 for row2
+        All cx values and text-anchor="middle"
+      -->
+      <svg id="flow-svg" viewBox="0 0 760 452"
+           preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="an" viewBox="0 0 10 10" refX="8" refY="5"
+                  markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10Z" fill="#1B4F8A"/></marker>
+          <marker id="at" viewBox="0 0 10 10" refX="8" refY="5"
+                  markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10Z" fill="#0D7A6E"/></marker>
+          <marker id="ad" viewBox="0 0 10 10" refX="8" refY="5"
+                  markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10Z" fill="#C8D2DC"/></marker>
+
+          <!-- Clip paths — one per node -->
+          <clipPath id="cp-ehr">    <rect x="20"  y="20"  width="160" height="62" rx="10"/></clipPath>
+          <clipPath id="cp-br">     <rect x="220" y="20"  width="160" height="62" rx="10"/></clipPath>
+          <clipPath id="cp-auth">   <rect x="120" y="130" width="160" height="74" rx="10"/></clipPath>
+          <clipPath id="cp-idp">    <rect x="360" y="130" width="160" height="74" rx="10"/></clipPath>
+          <clipPath id="cp-hapi">   <rect x="70"  y="250" width="160" height="62" rx="10"/></clipPath>
+          <clipPath id="cp-cons">   <rect x="300" y="250" width="160" height="62" rx="10"/></clipPath>
+          <clipPath id="cp-audit">  <rect x="530" y="250" width="160" height="62" rx="10"/></clipPath>
+          <clipPath id="cp-lab">    <rect x="100" y="362" width="160" height="62" rx="10"/></clipPath>
+          <clipPath id="cp-ref">    <rect x="450" y="362" width="160" height="62" rx="10"/></clipPath>
+        </defs>
+
+        <!-- ── CONNECTIONS ──────────────────────────────── -->
+
+        <!-- Epic → Browser: horizontal y=51 -->
+        <line id="c-eb" x1="182" y1="51" x2="218" y2="51"
+              class="conn" marker-end="url(#ad)"/>
+
+        <!-- Browser → Auth: diagonal down-left -->
+        <path id="c-ba" d="M300,84 C300,108 200,110 200,128"
+              class="conn" marker-end="url(#ad)"/>
+
+        <!-- Browser → IdP: diagonal down-right -->
+        <path id="c-bi" d="M300,84 C300,108 440,110 440,128"
+              class="conn" marker-end="url(#ad)"/>
+
+        <!-- Auth → HAPI: vertical (left column) -->
+        <line id="c-ah" x1="200" y1="206" x2="180" y2="248"
+              class="conn" marker-end="url(#ad)"/>
+
+        <!-- Auth → Consent: horizontal then down -->
+        <path id="c-ac" d="M280,167 C320,167 340,210 380,248"
+              class="conn" marker-end="url(#ad)"/>
+
+        <!-- HAPI → Audit: horizontal right -->
+        <path id="c-hau" d="M232,281 C330,281 460,281 528,281"
+              class="conn" marker-end="url(#ad)"/>
+
+        <!-- HAPI → Lab: near-vertical down-right -->
+        <path id="c-hl" d="M180,314 C180,340 180,360 180,360"
+              class="conn" marker-end="url(#ad)"/>
+
+        <!-- HAPI → Referral: wide bezier right-down -->
+        <path id="c-hr" d="M230,314 C350,314 450,340 530,360"
+              class="conn" marker-end="url(#ad)"/>
+
+        <!-- Referral → Audit: bezier up-right -->
+        <path id="c-rau" d="M530,362 C530,310 610,310 610,312"
+              class="conn" marker-end="url(#ad)"/>
+
+        <!-- ── NODES ─────────────────────────────────────── -->
+
+        <!-- Epic EHR  x=20 y=20 w=160 h=62 cx=100 -->
+        <g class="node" id="n-ehr">
+          <rect x="20" y="20" width="160" height="62" rx="10"/>
+          <g clip-path="url(#cp-ehr)">
+            <text class="nb" x="34" y="37" font-size="9">EHR</text>
+            <text class="nt" x="100" y="52" font-size="15" text-anchor="middle">Epic EHR</text>
+            <text class="ns" x="100" y="68" font-size="12" text-anchor="middle">Launch initiator</text>
+          </g>
+        </g>
+
+        <!-- Browser  x=220 y=20 w=160 h=62 cx=300 -->
+        <g class="node" id="n-br">
+          <rect x="220" y="20" width="160" height="62" rx="10"/>
+          <g clip-path="url(#cp-br)">
+            <text class="nt" x="300" y="49" font-size="15" text-anchor="middle">Browser</text>
+            <text class="ns" x="300" y="65" font-size="12" text-anchor="middle">Clinician · SMART Client</text>
+          </g>
+        </g>
+
+        <!-- Auth Server  x=120 y=130 w=160 h=74 cx=200 -->
+        <g class="node" id="n-auth">
+          <rect x="120" y="130" width="160" height="74" rx="10"/>
+          <g clip-path="url(#cp-auth)">
+            <text class="nt" x="200" y="155" font-size="15" text-anchor="middle">Auth Server</text>
+            <text class="ns" x="200" y="171" font-size="12" text-anchor="middle">Spring AS 1.3</text>
+            <text class="ns" x="200" y="185" font-size="12" text-anchor="middle">PKCE · RS256 · v2.2</text>
+          </g>
+        </g>
+
+        <!-- IdP Federation  x=360 y=130 w=160 h=74 cx=440 -->
+        <g class="node" id="n-idp">
+          <rect x="360" y="130" width="160" height="74" rx="10"/>
+          <g clip-path="url(#cp-idp)">
+            <text class="nt" x="440" y="155" font-size="15" text-anchor="middle">IdP Federation</text>
+            <text class="ns" x="440" y="171" font-size="12" text-anchor="middle">Azure AD · Okta</text>
+            <text class="ns" x="440" y="185" font-size="12" text-anchor="middle">Epic IdP · ADFS</text>
+          </g>
+        </g>
+
+        <!-- HAPI FHIR  x=70 y=250 w=160 h=62 cx=150 -->
+        <g class="node" id="n-hapi">
+          <rect x="70" y="250" width="160" height="62" rx="10"/>
+          <g clip-path="url(#cp-hapi)">
+            <text class="nt" x="150" y="276" font-size="15" text-anchor="middle">HAPI FHIR</text>
+            <text class="ns" x="150" y="292" font-size="12" text-anchor="middle">:8080 · FHIR R4 · JPA</text>
+          </g>
+        </g>
+
+        <!-- Consent Manager  x=300 y=250 w=160 h=62 cx=380 -->
+        <g class="node" id="n-cons">
+          <rect x="300" y="250" width="160" height="62" rx="10"/>
+          <g clip-path="url(#cp-cons)">
+            <text class="nt" x="380" y="274" font-size="15" text-anchor="middle">Consent Manager</text>
+            <text class="ns" x="380" y="290" font-size="12" text-anchor="middle">FHIR Consent · GDPR</text>
+          </g>
+        </g>
+
+        <!-- Audit Store  x=530 y=250 w=160 h=62 cx=610 -->
+        <g class="node" id="n-audit">
+          <rect x="530" y="250" width="160" height="62" rx="10"/>
+          <g clip-path="url(#cp-audit)">
+            <text class="nt" x="610" y="274" font-size="15" text-anchor="middle">Audit Store</text>
+            <text class="ns" x="610" y="290" font-size="12" text-anchor="middle">IHE ATNA · AuditEvent</text>
+          </g>
+        </g>
+
+        <!-- Lab System  x=100 y=362 w=160 h=62 cx=180 -->
+        <g class="node" id="n-lab">
+          <rect x="100" y="362" width="160" height="62" rx="10"/>
+          <g clip-path="url(#cp-lab)">
+            <text class="nb" x="113" y="378" font-size="9">LAB</text>
+            <text class="nt" x="180" y="391" font-size="15" text-anchor="middle">Lab System</text>
+            <text class="ns" x="180" y="407" font-size="12" text-anchor="middle">SR → Obs → DiagReport</text>
+          </g>
+        </g>
+
+        <!-- Referral Module  x=450 y=362 w=160 h=62 cx=530 -->
+        <g class="node" id="n-ref">
+          <rect x="450" y="362" width="160" height="62" rx="10"/>
+          <g clip-path="url(#cp-ref)">
+            <text class="nb" x="463" y="378" font-size="9">REF</text>
+            <text class="nt" x="530" y="391" font-size="15" text-anchor="middle">Referral Module</text>
+            <text class="ns" x="530" y="407" font-size="12" text-anchor="middle">ServiceRequest + Task</text>
+          </g>
+        </g>
+
+        <!-- Packet -->
+        <circle id="pkt" r="5" cx="-20" cy="-20" opacity="0"
+                fill="#0D7A6E"
+                style="filter:drop-shadow(0 0 5px rgba(13,122,110,.8))"/>
+      </svg>
+    </div>
+
+    <!-- Info panel -->
+    <div id="infopanel">
+      <div id="ip-badge">Phase 1 · Launch</div>
+      <div id="ip-title">EHR Launch</div>
+      <div id="ip-body">Dr. Priya clicks the cardiology app in Epic. The EHR passes a secure launch token with patient and encounter context.</div>
+      <div id="ip-compliance">🔒 Atomic single-use launch token
+PKCE S256 · RFC 7636
+Spring AS 1.3 · :9000</div>
+      <a id="ip-link" href="/demo" target="_top">Full 34-step demo ↗</a>
+    </div>
+  </div>
+
+  <!-- Bottom bar -->
+  <div id="bottombar">
+    <button id="btn-play" title="Play / Pause">▶</button>
+    <div id="prog"><div id="prog-fill"></div></div>
+    <span id="bb-hint">Auto-plays in 2s</span>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════
+   Demo A — 4-phase homepage embed
+   Fixed:
+   1. SVG class manipulation uses setAttribute (not .className=)
+   2. Dot clicks resume auto-play from that phase
+   3. After phase 4, loops back to phase 1 automatically
+   4. setBtn never uses cssText (preserves all CSS rule styles)
+   ════════════════════════════════════════════════════════ */
+
+const PHASES = [
+  {
+    label: 'EHR launch — clinician opens cardiology app in Epic',
+    badge: 'Phase 1 · Launch', badgeColor: '#1B4F8A', badgeBg: '#E8F0FA',
+    title: 'EHR Launch',
+    body: 'Dr. Priya clicks the cardiology app in Epic. The EHR passes a secure launch token identifying the patient and encounter context.',
+    comp: '🔒 Atomic single-use launch token\nPKCE S256 · RFC 7636\nSMART App Launch v2.2',
+    navy: ['n-ehr','n-br'], teal: [], done: [],
+    cnavy: ['c-eb'], cteal: [],
+    pct: 5,
+  },
+  {
+    label: 'Clinician authenticated — PKCE + RS256 token issued',
+    badge: 'Phase 2 · Auth', badgeColor: '#133A6A', badgeBg: '#E0EAFE',
+    title: 'Authentication',
+    body: 'Auth Server validates the launch token, authenticates Dr. Priya via Azure AD, and issues a signed RS256 access token with patient scope.',
+    comp: '🔐 RS256 JWT · JWKS rotation\nPKCE S256 enforced · 96-byte verifier\nAzure AD · Okta · Epic IdP',
+    navy: ['n-auth','n-idp'], teal: [], done: ['n-ehr','n-br'],
+    cnavy: ['c-ba','c-bi'], cteal: [],
+    pct: 35,
+  },
+  {
+    label: 'Consent checked · FHIR data accessed · lab results returned',
+    badge: 'Phase 3 · Data', badgeColor: '#0A5A50', badgeBg: '#D8F0E8',
+    title: 'Data Access + Lab',
+    body: 'Consent Manager verifies patient consent. HAPI FHIR returns patient data with scope enforcement. Lab System posts DiagnosticReport (Hb, WBC, LDL) back to HAPI.',
+    comp: '✅ FHIR Consent.provision=permit\npatient/Observation.rs enforced\nLOINC codes · GDPR Art.9 · HIPAA',
+    navy: [], teal: ['n-hapi','n-cons','n-br','n-lab'], done: ['n-ehr','n-auth','n-idp'],
+    cnavy: [], cteal: ['c-ah','c-ac','c-hl'],
+    pct: 70,
+  },
+  {
+    label: 'Referral created · every access logged — IHE ATNA audit trail',
+    badge: 'Phase 4 · Audit', badgeColor: '#6B3A0A', badgeBg: '#FDF0E0',
+    title: 'Referral + Audit',
+    body: 'Referral Module creates ServiceRequest + Task for cross-facility referral. Every event — auth, consent, data, referral — logged as a FHIR AuditEvent.',
+    comp: '📋 FHIR ServiceRequest + Task\nHIPAA § 164.312 · IHE ATNA\nGDPR Art.30 · 7 AuditEvents total',
+    navy: [], teal: ['n-audit','n-ref'], done: ['n-ehr','n-br','n-auth','n-idp','n-hapi','n-cons','n-lab'],
+    cnavy: [], cteal: ['c-hau','c-hr','c-rau'],
+    pct: 100,
+  },
+];
+
+const ALL_N = ['n-ehr','n-br','n-auth','n-idp','n-hapi','n-cons','n-audit','n-lab','n-ref'];
+const ALL_C = ['c-eb','c-ba','c-bi','c-ah','c-ac','c-hau','c-hl','c-hr','c-rau'];
+const MARK  = { navy:'url(#an)', teal:'url(#at)', dim:'url(#ad)' };
+
+const DURATION   = 3400;  // ms per phase
+const AUTO_DELAY = 2000;  // ms before first auto-play
+
+let cur = -1, timer = null;
+
+/* DOM refs — all resolved once at startup */
+const D = {
+  phase : document.getElementById('tb-phase'),
+  label : document.getElementById('tb-label'),
+  dots  : [...document.querySelectorAll('.pdot')],
+  badge : document.getElementById('ip-badge'),
+  title : document.getElementById('ip-title'),
+  body  : document.getElementById('ip-body'),
+  comp  : document.getElementById('ip-compliance'),
+  play  : document.getElementById('btn-play'),
+  fill  : document.getElementById('prog-fill'),
+  hint  : document.getElementById('bb-hint'),
+};
+
+/* ── SVG class helpers (safe cross-browser) ─────────────────── */
+function svgClass(el, cls) {
+  /* setAttribute is universally safe for SVG elements */
+  if (!el) return;
+  el.setAttribute('class', cls);
+}
+
+/* ── Apply phase state to diagram ──────────────────────────── */
+function applyDiagram(p) {
+  ALL_N.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if      (p.navy.includes(id)) svgClass(el, 'node navy');
+    else if (p.teal.includes(id)) svgClass(el, 'node teal');
+    else if (p.done.includes(id)) svgClass(el, 'node done');
+    else                          svgClass(el, 'node');
+  });
+  ALL_C.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (p.cnavy.includes(id)) {
+      svgClass(el, 'conn navy');
+      el.setAttribute('marker-end', MARK.navy);
+    } else if (p.cteal.includes(id)) {
+      svgClass(el, 'conn teal');
+      el.setAttribute('marker-end', MARK.teal);
+    } else {
+      svgClass(el, 'conn');
+      el.setAttribute('marker-end', MARK.dim);
+    }
+  });
+}
+
+/* ── Update all UI for a given phase index ──────────────────── */
+function render(idx) {
+  cur = idx;
+  const p = PHASES[idx];
+
+  /* Top bar */
+  D.phase.textContent = 'Phase ' + (idx + 1) + ' / 4';
+  D.label.textContent = p.label;
+
+  /* Phase dots */
+  D.dots.forEach((d, i) => {
+    d.setAttribute('class',
+      'pdot' + (i < idx ? ' done' : i === idx ? ' active' : ''));
+  });
+
+  /* Info panel */
+  D.badge.textContent = p.badge;
+  D.badge.style.background = p.badgeBg;
+  D.badge.style.color      = p.badgeColor;
+  D.title.textContent = p.title;
+  D.body.textContent  = p.body;
+  D.comp.textContent  = p.comp;
+
+  /* Progress bar */
+  D.fill.style.width = p.pct + '%';
+
+  /* Diagram */
+  applyDiagram(p);
+}
+
+/* ── Timer control ──────────────────────────────────────────── */
+function startTimer() {
+  stopTimer();   /* always clear first — no double-timers */
+  timer = setInterval(function() {
+    var next = (cur + 1) % PHASES.length;
+    render(next);
+    /* after last phase: pause briefly then loop back */
+    if (next === PHASES.length - 1) {
+      stopTimer();
+      setPlayBtn(false);
+      D.hint.textContent = '↺ Replay';
+    }
+  }, DURATION);
+}
+
+function stopTimer() {
+  if (timer) { clearInterval(timer); timer = null; }
+}
+
+/* ── Play button visual state ────────────────────────────────
+   Uses individual style properties — never cssText —
+   so CSS rule styles (width/height/display/border-radius) are preserved */
+function setPlayBtn(on) {
+  D.play.textContent            = on ? '⏸' : '▶';
+  D.play.style.background       = on ? '#1B4F8A' : '#E8EEF4';
+  D.play.style.color            = on ? 'white'   : '#2C5070';
+  D.play.style.borderColor      = on ? '#1B4F8A' : '#C8D2DC';
+}
+
+/* ── Play / pause button ─────────────────────────────────── */
+D.play.addEventListener('click', function() {
+  if (timer) {
+    /* Currently playing — pause */
+    stopTimer();
+    setPlayBtn(false);
+    D.hint.textContent = '▶ Paused';
+  } else {
+    /* Currently paused or at end — start / restart */
+    if (cur >= PHASES.length - 1) render(0);
+    setPlayBtn(true);
+    startTimer();
+    D.hint.textContent = '⏸ Playing';
+  }
+});
+
+/* ── Phase dot clicks — jump and resume playing ──────────── */
+D.dots.forEach(function(d) {
+  d.addEventListener('click', function() {
+    var idx = parseInt(d.getAttribute('data-i'), 10);
+    render(idx);
+    /* always resume playing after a manual jump */
+    setPlayBtn(true);
+    startTimer();
+    D.hint.textContent = '⏸ Playing';
+  });
+});
+
+/* ── Initialise ─────────────────────────────────────────── */
+render(0);
+D.hint.textContent = 'Auto-plays in 2s';
+
+setTimeout(function() {
+  setPlayBtn(true);
+  startTimer();
+  D.hint.textContent = '⏸ Playing';
+}, AUTO_DELAY);
+</script>
+</body>
+</html>
